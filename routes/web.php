@@ -21,6 +21,7 @@ use App\Http\Controllers\HakAksesController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\UbahPasswordController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PermintaanController;
 
 // ✅ NOTIF (pakai NotificationController yang sudah ada)
 use App\Http\Controllers\NotificationController;
@@ -211,6 +212,39 @@ Route::delete('/customer/{customer}', [CustomerController::class, 'destroy'])->n
 
         Route::delete('/barang-keluar/{barangKeluar}', [BarangKeluarController::class, 'destroy'])
             ->name('barang-keluar.destroy');
+            /*
+|--------------------------------------------------------------------------
+| PERMINTAAN BARANG (sementara superadmin saja)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/permintaan', [PermintaanController::class, 'index'])
+    ->name('permintaan.index');
+
+Route::get('/permintaan/create', [PermintaanController::class, 'create'])
+    ->name('permintaan.create');
+
+Route::post('/permintaan', [PermintaanController::class, 'store'])
+    ->name('permintaan.store');
+
+Route::get('/permintaan/{permintaan}', [PermintaanController::class, 'show'])
+    ->name('permintaan.show');
+
+// Approve
+Route::post('/permintaan/{permintaan}/approve', [PermintaanController::class, 'approve'])
+    ->name('permintaan.approve');
+
+// Reject
+Route::post('/permintaan/{permintaan}/reject', [PermintaanController::class, 'reject'])
+    ->name('permintaan.reject');
+
+// Proses jadi Barang Keluar (kurangi stok & masuk histori)
+Route::post('/permintaan/{permintaan}/process', [PermintaanController::class, 'processToKeluar'])
+    ->name('permintaan.process');
+
+// Halaman admin / histori (lihat semua permintaan)
+Route::get('/permintaan-admin', [PermintaanController::class, 'adminIndex'])
+    ->name('permintaan.admin');
 
         // ======================
         // PURCHASE ORDER (PO)

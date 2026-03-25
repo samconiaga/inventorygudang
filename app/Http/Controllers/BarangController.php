@@ -9,11 +9,28 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class BarangController extends Controller
 {
+    /**
+     * Helper: generate simple barcode string from nama barang.
+     * - Replace non-alnum with dash, collapse multiple dashes, uppercase.
+     */
+    private function generateBarcodeFromName(string $name): string
+    {
+        // replace non-alphanumeric with dash
+        $s = preg_replace('/[^A-Z0-9]+/i', '-', $name);
+        // collapse multiple dashes
+        $s = preg_replace('/-+/', '-', $s);
+        // trim dashes
+        $s = trim($s, '-');
+        $s = strtoupper($s);
+        return $s === '' ? 'ITEM' : $s;
+    }
+
     public function index()
     {
         return view('barang.index', [
@@ -90,10 +107,10 @@ class BarangController extends Controller
         // kode_barang dari ID
         $kode_barang = 'BRG-' . str_pad((string)$barang->id, 6, '0', STR_PAD_LEFT);
 
-        // barcode default = kode_barang jika kosong
+        // barcode default = jika user isi gunakan itu, kalau kosong generate dari nama_barang
         $barcode = $barang->barcode;
         if (empty($barcode)) {
-            $barcode = $kode_barang;
+            $barcode = $this->generateBarcodeFromName($barang->nama_barang);
         }
         $barcode = strtoupper(trim($barcode));
 
@@ -165,13 +182,21 @@ class BarangController extends Controller
             $gambarPath = $path . '/' . $fileName;
         }
 
-        // barcode optional: kalau dikosongkan -> keep old
+        // barcode optional: kalau user mengirim null -> keep old
         $newBarcode = $request->barcode;
         if ($newBarcode !== null) {
             $newBarcode = strtoupper(trim($newBarcode));
-            if ($newBarcode === '') $newBarcode = $barang->barcode;
+            if ($newBarcode === '') {
+                // jika dikosongkan, tetap gunakan barcode yang dihasilkan dari nama (jika user kosongkan)
+                $newBarcode = $this->generateBarcodeFromName($request->nama_barang ?? $barang->nama_barang);
+            }
         } else {
-            $newBarcode = $barang->barcode;
+            // kalau user tidak mengirim field barcode sama sekali, generate dari nama jika nama berubah
+            if (isset($request->nama_barang) && $request->nama_barang !== $barang->nama_barang) {
+                $newBarcode = $this->generateBarcodeFromName($request->nama_barang);
+            } else {
+                $newBarcode = $barang->barcode;
+            }
         }
 
         $barang->update([
@@ -351,13 +376,9 @@ class BarangController extends Controller
             }
 
             // ========= 2) FALLBACK CERDAS (kalau header ga ketemu) =========
-            // Cari baris data pertama yang "masuk akal", lalu tebak kolom:
-            // - kolom nama: yang paling banyak isinya string
-            // - kolom stok: yang paling banyak numeric
             if ($headerRowIndex === null) {
                 $dataStart = 1;
 
-                // cari baris yang berisi "data"
                 for ($i = 1; $i <= $scanMax; $i++) {
                     $row = $rows[$i] ?? [];
                     $nonEmpty = 0;
@@ -370,10 +391,8 @@ class BarangController extends Controller
                     }
                 }
 
-                // ambil semua col yang ada di sheet dari baris itu
                 $cols = array_keys($rows[$dataStart] ?? []);
 
-                // scoring tiap kolom
                 $nameScore = [];
                 $numScore  = [];
                 foreach ($cols as $c) {
@@ -381,7 +400,6 @@ class BarangController extends Controller
                     $numScore[$c]  = 0;
                 }
 
-                // lihat 20 baris setelahnya untuk menentukan pola
                 $look = min($dataStart + 20, count($rows));
                 for ($r = $dataStart; $r <= $look; $r++) {
                     $row = $rows[$r] ?? [];
@@ -391,22 +409,18 @@ class BarangController extends Controller
 
                         if ($s === '') continue;
 
-                        // numeric?
                         if ($isNumeric($val)) {
                             $numScore[$c] += 2;
                         } else {
-                            // string panjang dianggap nama
                             if (mb_strlen($s) >= 3) $nameScore[$c] += 2;
                             else $nameScore[$c] += 1;
                         }
                     }
                 }
 
-                // ambil kandidat nama = score string tertinggi
                 arsort($nameScore);
                 $colNama = array_key_first($nameScore);
 
-                // ambil kandidat stok = score numeric tertinggi tapi bukan colNama
                 arsort($numScore);
                 $colStok = null;
                 foreach ($numScore as $c => $sc) {
@@ -417,12 +431,10 @@ class BarangController extends Controller
                     }
                 }
 
-                // kalau masih null (file aneh), fallback terakhir: B=nama, C=stok (umum: No, Nama, Stok)
                 if (!$colNama) $colNama = 'B';
                 if (!$colStok) $colStok = 'C';
 
-                // karena ini bukan header, data mulai dari baris dataStart (bukan +1)
-                $headerRowIndex = $dataStart - 1; // supaya loop mulai dataStart
+                $headerRowIndex = $dataStart - 1;
             }
 
             $jenisId  = (int) $request->jenis_id;
@@ -458,7 +470,7 @@ class BarangController extends Controller
                     continue;
                 }
 
-                // create -> kode & barcode auto dari id
+                // create -> kode & barcode auto dari nama
                 $barang = Barang::create([
                     'kode_barang'  => 'TEMP',
                     'barcode'      => null,
@@ -473,7 +485,8 @@ class BarangController extends Controller
                 ]);
 
                 $kode_barang = 'BRG-' . str_pad((string)$barang->id, 6, '0', STR_PAD_LEFT);
-                $barcode = strtoupper($kode_barang);
+                // generate barcode from name (requested)
+                $barcode = $this->generateBarcodeFromName($nama);
 
                 $barang->update([
                     'kode_barang' => $kode_barang,

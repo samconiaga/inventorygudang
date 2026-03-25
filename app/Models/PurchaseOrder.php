@@ -4,48 +4,71 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Supplier;
+use App\Models\Customer;
+use App\Models\User;
+use App\Models\PurchaseOrderItem;
+use App\Models\BarangMasuk;
 
 class PurchaseOrder extends Model
 {
     use HasFactory;
 
+    protected $table = 'purchase_orders';
+
     protected $fillable = [
         'po_number',
         'supplier_id',
-        'department_id',
+        'department_id',   // ini sekarang refer ke customers.id
         'estimate_date',
         'status',
         'created_by',
         'notes',
     ];
 
-    // relasi ke supplier
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONSHIPS
+    |--------------------------------------------------------------------------
+    */
+
+    // =========================
+    // Supplier
+    // =========================
     public function supplier()
     {
-        return $this->belongsTo(Supplier::class);
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 
-    // relasi ke departemen
+    // =========================
+    // Departemen (ambil dari customers)
+    // =========================
     public function department()
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(Customer::class, 'department_id');
     }
 
-    // user yang membuat
+    // =========================
+    // User pembuat PO
+    // =========================
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // detail item
+    // =========================
+    // Detail item PO
+    // =========================
     public function items()
     {
-        return $this->hasMany(PurchaseOrderItem::class);
+        return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id');
     }
 
-    // relasi ke barang masuk (jika mau)
+    // =========================
+    // Relasi ke barang masuk
+    // =========================
     public function barangMasuks()
     {
-        return $this->hasMany(BarangMasuk::class);
+        return $this->hasMany(BarangMasuk::class, 'purchase_order_id');
     }
 }

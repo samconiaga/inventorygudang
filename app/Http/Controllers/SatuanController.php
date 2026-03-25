@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Satuan;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 
 class SatuanController extends Controller
@@ -14,25 +13,20 @@ class SatuanController extends Controller
      */
     public function index()
     {
-        return view('satuan-barang.index',[
+        return view('satuan-barang.index', [
             'satuans' => Satuan::all()
         ]);
     }
 
+    /**
+     * API: get all satuan (JSON)
+     */
     public function getDataSatuanBarang()
     {
         return response()->json([
             'success' => true,
-            'data'    => Satuan::all()
+            'data'    => Satuan::orderBy('id')->get()
         ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('satuan-barang.create');
     }
 
     /**
@@ -41,44 +35,37 @@ class SatuanController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'satuan'  => 'required'
+            'satuan'  => 'required|string|max:255'
         ],[
             'satuan.required' => 'Form Satuan Barang Wajib Di Isi !'
         ]);
 
-        if($validator->fails()){
+        if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
         $satuan = Satuan::create([
-            'satuan'    => $request->satuan,
-            'user_id'   => auth()->user()->id
+            'satuan'  => $request->satuan,
+            'user_id' => auth()->id()
         ]);
 
         return response()->json([
-            'success'   => true,
-            'message'   => 'Data Berhasil Disimpan !',
-            'data'      => $satuan
+            'success' => true,
+            'message' => 'Data Berhasil Disimpan !',
+            'data'    => $satuan
         ]);
     }
 
     /**
-     * Display the specified resource.
-     */
-    public function show(Satuan $satuan)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
+     * Show the form for editing the specified resource (AJAX).
      */
     public function edit($id)
     {
         $satuan = Satuan::findOrFail($id);
+
         return response()->json([
             'success' => true,
-            'message' => 'Edit Data Barang',
+            'message' => 'Edit Data Satuan',
             'data'    => $satuan
         ]);
     }
@@ -88,27 +75,27 @@ class SatuanController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $satuan = Satuan::find($id);
+        $satuan = Satuan::findOrFail($id);
 
-        $validator = Validator::make($request->all(),[
-            'satuan'  => 'required'
+        $validator = Validator::make($request->all(), [
+            'satuan' => 'required|string|max:255'
         ],[
-            'satuan.required' => 'Form satuan Barang Tidak Boleh Kosong'
+            'satuan.required' => 'Form Satuan Barang Tidak Boleh Kosong'
         ]);
 
-        if($validator->fails()){
+        if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
         $satuan->update([
-            'satuan'    => $request->satuan,
-            'user_id'   => auth()->user()->id
+            'satuan'  => $request->satuan,
+            'user_id' => auth()->id()
         ]);
 
         return response()->json([
-            'success'   => true,
-            'message'   => 'Data Berhasil Terupdate',
-            'data'      => $satuan
+            'success' => true,
+            'message' => 'Data Berhasil Terupdate',
+            'data'    => $satuan
         ]);
     }
 
@@ -117,7 +104,8 @@ class SatuanController extends Controller
      */
     public function destroy($id)
     {
-        Satuan::find($id)->delete();
+        $satuan = Satuan::findOrFail($id);
+        $satuan->delete();
 
         return response()->json([
             'success' => true,

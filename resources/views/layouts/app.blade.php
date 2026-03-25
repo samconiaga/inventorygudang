@@ -170,6 +170,9 @@
       color: var(--ig-red-dark);
       text-decoration: none;
     }
+
+    /* small helpers */
+    .sidebar .menu-header { color: rgba(255,255,255,.7); padding: 8px 16px; font-size: 12px; text-transform: uppercase; }
   </style>
 
   @stack('styles')
@@ -230,12 +233,12 @@
           {{-- USER --}}
           <li class="dropdown">
             <a href="#" data-toggle="dropdown" class="nav-link dropdown-toggle nav-link-lg nav-link-user">
-              <img alt="image" src="{{ asset('assets/img/avatar/avatar-1.png') }}" class="rounded-circle mr-1">
+              <img alt="image" src="{{ asset('assets/img/avatar/avatar-1.png') }}" class="rounded-circle mr-1" width="36" height="36">
               <div class="d-sm-none d-lg-inline-block">Hi, {{ auth()->user()->name }}</div>
             </a>
 
             <div class="dropdown-menu dropdown-menu-right">
-              <a href="/ubah-password" class="dropdown-item has-icon">
+              <a href="{{ url('/ubah-password') }}" class="dropdown-item has-icon">
                 <i class="fas fa-lock"></i> Ubah Password
               </a>
 
@@ -282,7 +285,7 @@
           <ul class="sidebar-menu">
 
             {{-- ================== KEPALA GUDANG ================== --}}
-            @if (auth()->user()->role->role === 'kepala gudang')
+            @if (optional(auth()->user()->role)->role === 'kepala gudang')
               <li class="sidebar-item">
                 <a class="nav-link {{ Request::is('/') || Request::is('dashboard') ? 'active' : '' }}" href="/">
                   <i class="fas fa-fire"></i> <span class="align-middle">Dashboard</span>
@@ -299,7 +302,7 @@
             @endif
 
             {{-- ================== SUPERADMIN ================== --}}
-            @if (auth()->user()->role->role === 'superadmin')
+            @if (optional(auth()->user()->role)->role === 'superadmin')
               <li class="sidebar-item">
                 <a class="nav-link {{ Request::is('/') || Request::is('dashboard') ? 'active' : '' }}" href="/">
                   <i class="fas fa-fire"></i> <span class="align-middle">Dashboard</span>
@@ -308,7 +311,7 @@
 
               <li class="menu-header">DATA MASTER</li>
               <li class="dropdown">
-                <a href="#" class="nav-link has-dropdown {{ Request::is('barang') || Request::is('jenis-barang') || Request::is('satuan-barang') ? 'active' : '' }}" data-toggle="dropdown">
+                <a href="#" class="nav-link has-dropdown {{ Request::is('barang*') || Request::is('jenis-barang*') || Request::is('satuan-barang*') ? 'active' : '' }}" data-toggle="dropdown">
                   <i class="fas fa-cubes"></i><span>Data Barang</span>
                 </a>
                 <ul class="dropdown-menu">
@@ -319,8 +322,8 @@
               </li>
 
               <li class="dropdown">
-                <a href="#" class="nav-link has-dropdown {{ Request::is('supplier') || Request::is('customer') ? 'active' : '' }}" data-toggle="dropdown">
-                  <i class="fas fa-building"></i><span>Perusahaan</span>
+                <a href="#" class="nav-link has-dropdown {{ Request::is('supplier*') || Request::is('customer*') ? 'active' : '' }}" data-toggle="dropdown">
+                  <i class="fas fa-building"></i><span>Data Utama</span>
                 </a>
                 <ul class="dropdown-menu">
                   <li><a class="nav-link {{ Request::is('supplier') ? 'active' : '' }}" href="/supplier"><i class="fas fa-circle fa-xs"></i> Supplier</a></li>
@@ -334,8 +337,12 @@
                   <i class="fas fa-file-invoice"></i><span>Purchase Order (PO)</span>
                 </a>
               </li>
-              <li><a class="nav-link {{ Request::is('barang-masuk') ? 'active' : '' }}" href="/barang-masuk"><i class="fas fa-arrow-right"></i><span>Barang Masuk</span></a></li>
-              <li><a class="nav-link {{ Request::is('barang-keluar') ? 'active' : '' }}" href="/barang-keluar"><i class="fas fa-arrow-left"></i> <span>Barang Keluar</span></a></li>
+              <li><a class="nav-link {{ Request::is('barang-masuk*') ? 'active' : '' }}" href="/barang-masuk"><i class="fas fa-arrow-right"></i><span>Barang Masuk</span></a></li>
+              <li><a class="nav-link {{ Request::is('barang-keluar*') ? 'active' : '' }}" href="/barang-keluar"><i class="fas fa-arrow-left"></i> <span>Barang Keluar</span></a></li>
+
+              {{-- PERMINTAAN BARANG (ditambahkan) --}}
+              <li><a class="nav-link {{ Request::is('permintaan') || Request::is('permintaan/*') ? 'active' : '' }}" href="{{ route('permintaan.index') }}"><i class="fas fa-box"></i><span>Permintaan Barang</span></a></li>
+              <li><a class="nav-link {{ Request::is('permintaan-admin') ? 'active' : '' }}" href="{{ route('permintaan.admin') }}"><i class="fas fa-history"></i><span>Histori Permintaan</span></a></li>
 
               <li class="menu-header">LAPORAN</li>
               <li><a class="nav-link {{ Request::is('laporan-stok') ? 'active' : '' }}" href="/laporan-stok"><i class="far fa-file"></i><span>Stok</span></a></li>
@@ -349,7 +356,7 @@
             @endif
 
             {{-- ================== ADMIN GUDANG ================== --}}
-            @if (auth()->user()->role->role === 'admin gudang')
+            @if (optional(auth()->user()->role)->role === 'admin gudang')
               <li class="sidebar-item">
                 <a class="nav-link {{ Request::is('/') || Request::is('dashboard') ? 'active' : '' }}" href="/">
                   <i class="fas fa-fire"></i> <span class="align-middle">Dashboard</span>
@@ -358,7 +365,7 @@
 
               <li class="menu-header">DATA MASTER</li>
               <li class="dropdown">
-                <a href="#" class="nav-link has-dropdown {{ Request::is('barang') || Request::is('jenis-barang') || Request::is('satuan-barang') ? 'active' : '' }}" data-toggle="dropdown">
+                <a href="#" class="nav-link has-dropdown {{ Request::is('barang*') || Request::is('jenis-barang*') || Request::is('satuan-barang*') ? 'active' : '' }}" data-toggle="dropdown">
                   <i class="fas fa-cubes"></i><span>Data Barang</span>
                 </a>
                 <ul class="dropdown-menu">
@@ -369,7 +376,7 @@
               </li>
 
               <li class="dropdown">
-                <a href="#" class="nav-link has-dropdown {{ Request::is('supplier') || Request::is('customer') ? 'active' : '' }}" data-toggle="dropdown">
+                <a href="#" class="nav-link has-dropdown {{ Request::is('supplier*') || Request::is('customer*') ? 'active' : '' }}" data-toggle="dropdown">
                   <i class="fas fa-building"></i><span>Perusahaan</span>
                 </a>
                 <ul class="dropdown-menu">
@@ -384,8 +391,12 @@
                   <i class="fas fa-file-invoice"></i><span>Purchase Order (PO)</span>
                 </a>
               </li>
-              <li><a class="nav-link {{ Request::is('barang-masuk') ? 'active' : '' }}" href="/barang-masuk"><i class="fas fa-arrow-right"></i><span>Barang Masuk</span></a></li>
-              <li><a class="nav-link {{ Request::is('barang-keluar') ? 'active' : '' }}" href="/barang-keluar"><i class="fas fa-arrow-left"></i> <span>Barang Keluar</span></a></li>
+              <li><a class="nav-link {{ Request::is('barang-masuk*') ? 'active' : '' }}" href="/barang-masuk"><i class="fas fa-arrow-right"></i><span>Barang Masuk</span></a></li>
+              <li><a class="nav-link {{ Request::is('barang-keluar*') ? 'active' : '' }}" href="/barang-keluar"><i class="fas fa-arrow-left"></i> <span>Barang Keluar</span></a></li>
+
+              {{-- PERMINTAAN BARANG --}}
+              <li><a class="nav-link {{ Request::is('permintaan') || Request::is('permintaan/*') ? 'active' : '' }}" href="{{ route('permintaan.index') }}"><i class="fas fa-box"></i><span>Permintaan Barang</span></a></li>
+              <li><a class="nav-link {{ Request::is('permintaan-admin') ? 'active' : '' }}" href="{{ route('permintaan.admin') }}"><i class="fas fa-history"></i><span>Histori Permintaan</span></a></li>
 
               <li class="menu-header">LAPORAN</li>
               <li><a class="nav-link {{ Request::is('laporan-stok') ? 'active' : '' }}" href="/laporan-stok"><i class="far fa-file"></i><span>Stok</span></a></li>
@@ -510,10 +521,13 @@
     async function fetchUnread(){
       try{
         const res = await fetch(NOTIF_UNREAD_URL, { headers: { 'Accept': 'application/json' }});
+        if (!res.ok) return;
         const json = await res.json();
         setBadge(json.count || 0);
         renderNotif(json.items || []);
-      }catch(e){}
+      }catch(e){
+        // console.error(e);
+      }
     }
 
     async function markAsRead(id){

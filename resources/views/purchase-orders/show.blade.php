@@ -15,7 +15,6 @@
     </div>
 </div>
 
-{{-- ALERT --}}
 @if(session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
@@ -24,7 +23,6 @@
 @endif
 
 <div class="row">
-    {{-- ================= HEADER PO ================= --}}
     <div class="col-md-6">
         <div class="card">
             <div class="card-header"><h4>Header PO</h4></div>
@@ -83,7 +81,6 @@
             </div>
         </div>
 
-        {{-- ============ CARD PURCHASING REVIEW (STEP 8) ============ --}}
         @if($po->status === 'pending_review')
             @php
                 $totalQty      = $po->items->sum('qty');
@@ -107,18 +104,14 @@
                     </ul>
 
                     <div class="d-flex flex-wrap gap-2">
-                        {{-- Approve (lanjut transaksi; status partial/completed) --}}
-                        <form action="{{ route('purchase-orders.approve', $po->id) }}"
-                              method="POST" class="mr-2">
+                        <form action="{{ route('purchase-orders.approve', $po->id) }}" method="POST" class="mr-2">
                             @csrf
                             <button type="submit" class="btn btn-success">
                                 ✔ Approve – lanjutkan transaksi
                             </button>
                         </form>
 
-                        {{-- Force Close (tutup PO walau masih selisih) --}}
-                        <form action="{{ route('purchase-orders.force-close', $po->id) }}"
-                              method="POST"
+                        <form action="{{ route('purchase-orders.force-close', $po->id) }}" method="POST"
                               onsubmit="return confirm('Yakin ingin menutup PO ini? Sisa qty tidak akan dipesan lagi.');">
                             @csrf
                             <button type="submit" class="btn btn-danger">
@@ -134,10 +127,8 @@
                 </div>
             </div>
         @endif
-        {{-- ============ END CARD PURCHASING REVIEW ============ --}}
     </div>
 
-    {{-- ================= ITEM PO ================= --}}
     <div class="col-md-6">
         <div class="card">
             <div class="card-header"><h4>Item PO</h4></div>
@@ -193,7 +184,6 @@
                     </table>
                 </div>
 
-                {{-- Integrasi ke Barang Masuk hanya kalau PO belum completed --}}
                 @if($po->status !== 'completed')
                     <div class="alert alert-info mt-2 mb-0 p-0 border-0 bg-transparent">
                         <a href="{{ route('barang-masuk.create-from-po', $po->id) }}"

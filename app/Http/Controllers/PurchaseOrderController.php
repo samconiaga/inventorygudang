@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Barang;
 use App\Models\Supplier;
-use App\Models\Department;
+use App\Models\Customer; // <- ambil departemen dari table customers
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
@@ -49,8 +49,6 @@ class PurchaseOrderController extends Controller
 
     /**
      * LIST PO AKTIF
-     * - superadmin: semua
-     * - selain superadmin: hanya PO department sendiri
      */
     public function index()
     {
@@ -66,8 +64,6 @@ class PurchaseOrderController extends Controller
 
     /**
      * HISTORY PO
-     * - superadmin: semua
-     * - selain superadmin: hanya PO department sendiri
      */
     public function history()
     {
@@ -84,18 +80,28 @@ class PurchaseOrderController extends Controller
     /**
      * Form Create PO.
      * - superadmin: boleh pilih departemen
-     * - selain superadmin: departemen bisa kamu hide di view (controller tetap kirim list utk aman)
+     * - selain superadmin: departemen otomatis (tapi kita tetap kirim data utk view)
      */
     public function create()
     {
-        $suppliers   = Supplier::orderBy('supplier')->get();
-        $departments = Department::orderBy('name')->get();
+        $suppliers = Supplier::orderBy('supplier')->get();
+
+        $isSuper = $this->isSuperadmin();
+        $myDeptId = $this->myDepartmentId();
+
+        // ambil customers (dipakai sebagai "departemen" sesuai permintaan)
+        if ($isSuper) {
+            $customers = Customer::orderBy('customer')->get();
+        } else {
+            // hanya kirim departemen user sendiri (untuk ditampilkan & diisi hidden)
+            $customers = Customer::where('id', $myDeptId)->get();
+        }
 
         $barangs = Barang::with(['jenis', 'satuan'])
             ->orderBy('nama_barang')
             ->get();
 
-        return view('purchase-orders.create', compact('suppliers', 'departments', 'barangs'));
+        return view('purchase-orders.create', compact('suppliers', 'customers', 'barangs', 'isSuper'));
     }
 
     /**
@@ -103,108 +109,154 @@ class PurchaseOrderController extends Controller
      * - department_id dipaksa sesuai user (kecuali superadmin)
      * - NOTIF: superadmin + user yang department_id sama dengan PO
      */
-    public function store(Request $request)
-    {
-        $isSuper  = $this->isSuperadmin();
-        $myDeptId = $this->myDepartmentId();
+   public function store(Request $request)
+{
+    $isSuper  = $this->isSuperadmin();
+    $myDeptId = $this->myDepartmentId();
 
-        // final dept:
-        $deptIdFinal = $isSuper ? $request->department_id : $myDeptId;
+    // final dept:
+    $deptIdFinal = $isSuper ? $request->department_id : $myDeptId;
 
-        $rules = [
-            'supplier_id'    => 'required|exists:suppliers,id',
-            'estimate_date'  => 'nullable|date',
-            'notes'          => 'nullable|string',
+    $rules = [
+        'supplier_id'    => 'required|exists:suppliers,id',
+        'estimate_date'  => 'nullable|date',
+        'notes'          => 'nullable|string',
 
-            'items'               => 'required|array|min:1',
-            'items.*.barang_id'   => 'nullable|exists:barangs,id',
-            'items.*.item_name'   => 'required|string',
-            'items.*.unit'        => 'nullable|string',
-            'items.*.qty'         => 'required|integer|min:1',
-            'items.*.barcode'     => 'nullable|string|max:100',
-        ];
+        'items'               => 'required|array|min:1',
+        'items.*.barang_id'   => 'nullable|exists:barangs,id',
+        'items.*.item_name'   => 'required|string',
+        'items.*.unit'        => 'nullable|string',
+        'items.*.qty'         => 'required|integer|min:1',
+        'items.*.barcode'     => 'nullable|string|max:100',
+    ];
 
-        if ($isSuper) {
-            $rules['department_id'] = 'required|exists:departments,id';
-        } else {
-            if (!$myDeptId) {
-                return back()->with('error', 'Akun Anda belum memiliki departemen. Silakan set departemen pada Data Pengguna.');
-            }
-        }
-
-        $messages = [
-            'supplier_id.required'   => 'Supplier wajib dipilih',
-            'department_id.required' => 'Departemen peminta wajib dipilih',
-            'items.required'         => 'Minimal harus ada 1 item di PO',
-        ];
-
-        $validator = Validator::make($request->all(), $rules, $messages);
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $poNumber = $this->generatePoNumber();
-
-            $po = PurchaseOrder::create([
-                'po_number'     => $poNumber,
-                'supplier_id'   => $request->supplier_id,
-                'department_id' => $deptIdFinal,
-                'estimate_date' => $request->estimate_date,
-                'status'        => 'pending',
-                'created_by'    => Auth::id(),
-                'notes'         => $request->notes,
-            ]);
-
-            foreach ($request->items as $item) {
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $po->id,
-                    'barang_id'         => $item['barang_id'] ?? null,
-                    'item_name'         => $item['item_name'],
-                    'unit'              => $item['unit'] ?? null,
-                    'qty'               => $item['qty'],
-                    'barcode'           => $item['barcode'] ?? null,
-                    'qty_received'      => 0,
-                ]);
-            }
-
-            DB::commit();
-
-            // ==========================
-            // ✅ NOTIF: per department
-            // Target: superadmin + user dept PO
-            // ==========================
-            $targets = User::query()
-                ->with('role')
-                ->whereHas('role', function ($q) {
-                    // superadmin
-                    $q->whereRaw('LOWER(TRIM(role)) = ?', ['superadmin']);
-                })
-                ->orWhere('department_id', $po->department_id)
-                ->get();
-
-            // anti double (kalau superadmin juga kebetulan dep nya sama)
-            $targets = $targets->unique('id');
-
-            foreach ($targets as $u) {
-                $u->notify(new PurchaseOrderCreatedNotification($po));
-            }
-
-            return redirect()
-                ->route('purchase-orders.show', $po->id)
-                ->with('success', 'PO berhasil dibuat dengan nomor: ' . $po->po_number);
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan saat menyimpan PO: ' . $th->getMessage());
+    if ($isSuper) {
+        $rules['department_id'] = 'required|exists:customers,id';
+    } else {
+        if (!$myDeptId) {
+            return back()->with('error', 'Akun Anda belum memiliki departemen. Silakan set departemen pada Data Pengguna.');
         }
     }
 
+    $messages = [
+        'supplier_id.required'   => 'Supplier wajib dipilih',
+        'department_id.required' => 'Departemen peminta wajib dipilih',
+        'items.required'         => 'Minimal harus ada 1 item di PO',
+    ];
+
+    $validator = Validator::make($request->all(), $rules, $messages);
+
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    DB::beginTransaction();
+
+    try {
+
+        $poNumber = $this->generatePoNumber();
+
+        $po = PurchaseOrder::create([
+            'po_number'     => $poNumber,
+            'supplier_id'   => $request->supplier_id,
+            'department_id' => $deptIdFinal,
+            'estimate_date' => $request->estimate_date,
+            'status'        => 'pending',
+            'created_by'    => Auth::id(),
+            'notes'         => $request->notes,
+        ]);
+
+        foreach ($request->items as $item) {
+
+            $barangId     = $item['barang_id'] ?? null;
+            $itemName     = trim((string) ($item['item_name'] ?? ''));
+            $unit         = $item['unit'] ?? null;
+            $qty          = (int) ($item['qty'] ?? 0);
+            $inputBarcode = trim((string) ($item['barcode'] ?? ''));
+
+            // =============================
+            // FINAL BARCODE - AUTO FROM NAMA BARANG
+            // =============================
+
+            $finalBarcode = null;
+
+            // 1️⃣ kalau user isi manual → pakai itu
+            if ($inputBarcode !== '') {
+                $finalBarcode = strtoupper($inputBarcode);
+            }
+
+            // 2️⃣ kalau kosong → generate dari nama barang
+            if (empty($finalBarcode)) {
+
+                $sourceName = $itemName;
+
+                // kalau item_name kosong tapi pilih master barang
+                if ($sourceName === '' && $barangId) {
+                    $master = Barang::find($barangId);
+                    if ($master) {
+                        $sourceName = $master->nama_barang;
+                    }
+                }
+
+                $s = strtoupper($sourceName ?: 'ITEM');
+
+                // spasi jadi dash
+                $s = preg_replace('/\s+/', '-', $s);
+
+                // hanya huruf & angka
+                $s = preg_replace('/[^A-Z0-9\-]/', '', $s);
+
+                if ($s === '') {
+                    $s = 'ITEM-' . time();
+                }
+
+                $finalBarcode = $s;
+            }
+
+            PurchaseOrderItem::create([
+                'purchase_order_id' => $po->id,
+                'barang_id'         => $barangId,
+                'item_name'         => $itemName,
+                'unit'              => $unit,
+                'qty'               => $qty,
+                'barcode'           => $finalBarcode,
+                'qty_received'      => 0,
+            ]);
+        }
+
+        DB::commit();
+
+        // NOTIF: superadmin + user dept PO
+        $targets = User::query()
+            ->with('role')
+            ->whereHas('role', function ($q) {
+                $q->whereRaw('LOWER(TRIM(role)) = ?', ['superadmin']);
+            })
+            ->orWhere('department_id', $po->department_id)
+            ->get()
+            ->unique('id');
+
+        foreach ($targets as $u) {
+            $u->notify(new PurchaseOrderCreatedNotification($po));
+        }
+
+        return redirect()
+            ->route('purchase-orders.show', $po->id)
+            ->with('success', 'PO berhasil dibuat dengan nomor: ' . $poNumber);
+
+    } catch (\Throwable $th) {
+
+        DB::rollBack();
+
+        return back()->with(
+            'error',
+            'Terjadi kesalahan saat menyimpan PO: ' . $th->getMessage()
+        );
+    }
+}
+
     /**
      * Detail PO.
-     * - superadmin: boleh lihat semua
-     * - selain superadmin: hanya boleh lihat departemen sendiri
      */
     public function show($id)
     {
@@ -218,7 +270,6 @@ class PurchaseOrderController extends Controller
 
     /**
      * Hapus PO.
-     * Hanya boleh kalau status masih 'pending'
      */
     public function destroy($id)
     {

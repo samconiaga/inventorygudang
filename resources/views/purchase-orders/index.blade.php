@@ -49,7 +49,6 @@
             <tbody>
               @forelse($purchaseOrders as $po)
                 @php
-                  // badge
                   $badgeClass = match($po->status) {
                     'pending'         => 'warning',
                     'pending_review'  => 'info',
@@ -69,7 +68,6 @@
                     ? Carbon::parse($po->estimate_date)->format('d-m-Y')
                     : '-';
 
-                  // aman kalau relasi null
                   $supplierName   = optional($po->supplier)->supplier ?? '-';
                   $departmentName = optional($po->department)->name ?? '-';
                   $creatorName    = optional($po->creator)->name ?? '-';
@@ -108,11 +106,16 @@
                   </td>
                 </tr>
               @empty
-                <tr>
-                  <td colspan="8" class="text-center text-muted py-4">
-                    Belum ada Purchase Order aktif.
-                  </td>
-                </tr>
+                  <tr>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="text-center text-muted">Belum ada Purchase Order aktif.</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
               @endforelse
             </tbody>
 
@@ -127,7 +130,6 @@
 @push('scripts')
 <script>
 $(function () {
-  // kalau sudah pernah ke-init (misal page partial reload), hancurkan dulu
   if ($.fn.DataTable.isDataTable('#table_po')) {
     $('#table_po').DataTable().destroy();
   }

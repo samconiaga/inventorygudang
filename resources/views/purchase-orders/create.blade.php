@@ -61,14 +61,26 @@
                         <label class="font-weight-semibold">
                             Departemen Peminta <span class="text-danger">*</span>
                         </label>
-                        <select name="department_id" class="form-control" required>
-                            <option value="">-- Pilih Departemen --</option>
-                            @foreach($departments as $dept)
-                                <option value="{{ $dept->id }}" {{ old('department_id') == $dept->id ? 'selected' : '' }}>
-                                    {{ $dept->code }} / {{ $dept->name }}
-                                </option>
-                            @endforeach
-                        </select>
+
+                        @if($isSuper)
+                            {{-- Superadmin boleh pilih semua customer (departemen) --}}
+                            <select name="department_id" class="form-control" required>
+                                <option value="">-- Pilih Departemen --</option>
+                                @foreach($customers as $cust)
+                                    <option value="{{ $cust->id }}" {{ old('department_id') == $cust->id ? 'selected' : '' }}>
+                                        {{ $cust->customer }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        @else
+                            {{-- Non-superadmin: tampilkan nama departemen dan simpan id di input hidden --}}
+                            @php $dept = $customers->first(); @endphp
+                            <input type="text"
+                                   class="form-control"
+                                   value="{{ $dept?->customer ?? '-' }}"
+                                   readonly>
+                            <input type="hidden" name="department_id" value="{{ $dept?->id ?? '' }}">
+                        @endif
                     </div>
 
                     {{-- Estimate Date --}}
@@ -114,7 +126,7 @@
                                 <th style="width: 32%">Item (Master) &amp; Jenis</th>
                                 <th style="width: 14%">Unit</th>
                                 <th class="text-right" style="width: 110px">Qty</th>
-                                <th style="width: 22%">Barcode (optional)</th>
+                                <th style="width: 22%">Barcode</th>
                                 <th class="text-center" style="width: 60px">
                                     <i class="fa fa-cog"></i>
                                 </th>
@@ -129,7 +141,8 @@
                 <div class="px-4 pt-3 pb-3 text-muted small">
                     <i class="fa fa-info-circle"></i>
                     Minimal 1 item pada setiap PO. Jika barang sudah memiliki barcode dari master,
-                    akan otomatis terisi ketika pilih barang di kolom Item.
+                    akan otomatis terisi ketika pilih barang di kolom Item. Jika barcode tidak ada,
+                    server akan menghasilkan barcode dari nama produk sehingga barcode tidak kosong.
                 </div>
             </div>
         </div>
@@ -187,9 +200,8 @@
                 <input type="text"
                        class="form-control form-control-sm mt-1 jenis-field"
                        name="items[${rowCounter}][item_name]"
-                       placeholder="Jenis barang (otomatis dari master)"
-                       value="${item.item_name || ''}"
-                       readonly
+                       placeholder="Nama / jenis barang"
+                       value="${(item.item_name ?? '').replace(/"/g,'&quot;')}"
                        required>
             </td>
             <td>
@@ -197,7 +209,7 @@
                        class="form-control form-control-sm unit-field"
                        name="items[${rowCounter}][unit]"
                        placeholder="Unit"
-                       value="${item.unit || ''}">
+                       value="${(item.unit || '')}">
             </td>
             <td>
                 <input type="number"
@@ -211,8 +223,8 @@
                 <input type="text"
                        class="form-control form-control-sm barcode-field"
                        name="items[${rowCounter}][barcode]"
-                       value="${item.barcode || ''}"
-                       placeholder="Barcode (jika sudah ada)">
+                       value="${(item.barcode || '')}"
+                       placeholder="Barcode (akan terisi otomatis bila tersedia)">
             </td>
             <td class="text-center align-middle">
                 <button type="button"
@@ -271,9 +283,17 @@
             const barang   = findMasterBarang(barangId);
 
             if (barang) {
-                jenisField.value = barang.jenis || barang.nama || '';
-                unitField.value  = barang.satuan || '';
-                bcField.value    = barang.barcode || '';
+            if (barang) {
+    jenisField.value = barang.nama || barang.jenis || '';
+    unitField.value  = barang.satuan || '';
+
+    // 🔥 BARCODE GENERATE DARI NAMA BARANG (BUKAN DARI MASTER)
+    let s = (barang.nama || '').toUpperCase();
+    s = s.replace(/\s+/g, '-');
+    s = s.replace(/[^A-Z0-9\-]/g, '');
+
+    bcField.value = s;
+}
             } else {
                 jenisField.value = '';
                 unitField.value  = '';

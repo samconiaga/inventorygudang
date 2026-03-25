@@ -4,11 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Jenis;
 use Illuminate\Http\Request;
-use function Pest\Laravel\json;
-use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Controller;
-
-use Illuminate\Auth\Events\Validated;
 use Illuminate\Support\Facades\Validator;
 
 class JenisController extends Controller
@@ -23,20 +18,15 @@ class JenisController extends Controller
         ]);
     }
 
+    /**
+     * API: get all jenis (JSON)
+     */
     public function getDataJenisBarang()
     {
         return response()->json([
             'success' => true,
-            'data'    => Jenis::all()
+            'data'    => Jenis::orderBy('id')->get()
         ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('jenis-barang.create');
     }
 
     /**
@@ -45,44 +35,37 @@ class JenisController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'jenis_barang'  => 'required'
+            'jenis_barang'  => 'required|string|max:255'
         ],[
             'jenis_barang.required' => 'Form Jenis Barang Wajib Di Isi !'
         ]);
 
-        if($validator->fails()){
+        if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
         $jenisBarang = Jenis::create([
             'jenis_barang' => $request->jenis_barang,
-            'user_id'      => auth()->user()->id
+            'user_id'      => auth()->id()
         ]);
 
         return response()->json([
-            'success'   => true,
-            'message'   => 'Data Berhasil Disimpan !',
-            'data'      => $jenisBarang
+            'success' => true,
+            'message' => 'Data Berhasil Disimpan !',
+            'data'    => $jenisBarang
         ]);
     }
 
     /**
-     * Display the specified resource.
-     */
-    public function show(Jenis $jenis)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
+     * Show the form for editing the specified resource (AJAX).
      */
     public function edit($id)
     {
-        $jenis = Jenis::findOrFail($id);   
+        $jenis = Jenis::findOrFail($id);
+
         return response()->json([
             'success' => true,
-            'message' => 'Edit Data Barang',
+            'message' => 'Edit Data Jenis',
             'data'    => $jenis
         ]);
     }
@@ -92,27 +75,27 @@ class JenisController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $jenis = Jenis::find($id);
+        $jenis = Jenis::findOrFail($id);
 
-        $validator = Validator::make($request->all(),[
-            'jenis_barang'  => 'required',
+        $validator = Validator::make($request->all(), [
+            'jenis_barang'  => 'required|string|max:255',
         ],[
             'jenis_barang.required' => 'Form Jenis Barang Tidak Boleh Kosong'
         ]);
 
-        if($validator->fails()){
+        if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
         $jenis->update([
-            'jenis_barang'  => $request->jenis_barang,
-            'user_id'       => auth()->user()->id
+            'jenis_barang' => $request->jenis_barang,
+            'user_id'      => auth()->id()
         ]);
 
         return response()->json([
-            'success'   => true,
-            'message'   => 'Data Berhasil Terupdate',
-            'data'      => $jenis
+            'success' => true,
+            'message' => 'Data Berhasil Terupdate',
+            'data'    => $jenis
         ]);
     }
 
@@ -121,11 +104,12 @@ class JenisController extends Controller
      */
     public function destroy($id)
     {
-        Jenis::find($id)->delete();
+        $jenis = Jenis::findOrFail($id);
+        $jenis->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Data Berhasil Dihapus!'
-        ]);    
+        ]);
     }
 }

@@ -17,10 +17,11 @@
 
             <div class="col-md-6">
               <label class="d-block">Barcode</label>
-              <div class="p-3"
+              <div class="p-3 barcode-box"
                    style="border:1px dashed #d1d5db;border-radius:12px;background:#fafafa;min-height:275px;display:flex;align-items:center;justify-content:center;flex-direction:column;">
-                <div id="barcodePreviewDetail" style="font-family:'Libre Barcode 39', cursive;font-size:60px;line-height:1;color:#000;"></div>
-                <div id="barcodeHumanDetail" style="font-size:12px;letter-spacing:2px;color:#6b7280;font-weight:600;margin-top:8px;">-</div>
+                <!-- svg untuk render discan-able (tidak meluber) -->
+                <svg id="barcodePreviewDetail" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+                <div id="barcodeHumanDetail" style="font-size:12px;letter-spacing:0.4px;color:#6b7280;font-weight:600;margin-top:8px;">-</div>
               </div>
             </div>
 
@@ -87,3 +88,54 @@
     </div>
   </div>
 </div>
+
+@push('scripts')
+<style>
+/* batasi svg supaya tidak keluar kotak dan tetap discan-able */
+#barcodePreviewDetail { width:100%; max-width:380px; height:48px; display:block; }
+.modal .barcode-box { width:100%; align-items:center; justify-content:center; overflow:hidden; }
+@media (max-width:991px) {
+  #barcodePreviewDetail { max-width:280px; }
+}
+</style>
+
+<script>
+$(document).ready(function(){
+  function barcodeFromName(name){
+    if(!name) return 'ITEM';
+    return String(name).toUpperCase().trim()
+      .replace(/\s+/g,'-')
+      .replace(/[^A-Z0-9\-]/g,'')
+      .replace(/\-+/g,'-')
+      .replace(/^\-+|\-+$/g,'') || 'ITEM';
+  }
+
+  function renderDetailPreviewFromName(name){
+    const v = barcodeFromName(name);
+    try {
+      if (window.JsBarcode) {
+        JsBarcode('#barcodePreviewDetail', v, {
+          format: "CODE128",
+          displayValue: false,
+          height: 48,
+          margin: 0
+        });
+      } else {
+        $('#barcodePreviewDetail').text(v);
+      }
+    } catch(e) {
+      $('#barcodePreviewDetail').text(v);
+      console.error('JsBarcode render error (detail):', e);
+    }
+    $('#barcodeHumanDetail').text(name || '-');
+  }
+
+  // Pastikan ketika modal detail dibuka (index.js mengisi field) preview dibuat dari nama
+  $(document).on('shown.bs.modal', '#modal_detail_barang', function(){
+    const nama = $('#detail_nama_barang').val() || $('#detail_barcode').val() || '';
+    // prioritas: nama_barang; fallback ke barcode raw jika nama kosong
+    renderDetailPreviewFromName(nama);
+  });
+});
+</script>
+@endpush

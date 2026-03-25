@@ -5,13 +5,13 @@
 @include('barang.show')
 
 @section('content')
-<link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
+<!-- pakai JsBarcode untuk menghasilkan barcode CODE128 yang discan-able -->
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
 <style>
-  .barcode39{ font-family:'Libre Barcode 39', cursive; font-size:42px; line-height:1; color:#000; white-space:nowrap; }
-  .barcodeText{ font-size:11px; letter-spacing:2px; color:#6b7280; font-weight:600; margin-top:4px; }
-  .barcodeCell{ min-width:220px; }
-
+  .barcodeCell{ min-width:220px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+  .barcodeText{ font-size:13px; letter-spacing:0.4px; color:#374151; font-weight:600; margin-top:2px; word-break:break-word; max-width:220px; }
+  .barcodeCell svg{ width:220px; height:48px; }
   /* =========================
      FIX CLICK MODAL (STISLA / STACKING CONTEXT)
      ========================= */
@@ -173,19 +173,43 @@ $(document).ready(function() {
   loadTableBarang();
 });
 
-/* ============ UTIL BARCODE ============ */
-function toCode39(value){
-  if(!value) return { code39:'', human:'-' };
-  let v = String(value).toUpperCase().trim();
-  if(!v) return { code39:'', human:'-' };
-  return { code39: `*${v}*`, human: v };
+/* ============ UTIL BARCODE (sanitize value for barcode) ============ */
+function toBarcodeValue(value){
+  if(!value) return '';
+  // ubah ke uppercase, replace whitespace -> dash, buang char non-alnum/- 
+  return String(value).toUpperCase().trim().replace(/\s+/g,'-').replace(/[^A-Z0-9\-]/g,'').replace(/\-+/g,'-').replace(/^\-+|\-+$/g,'');
 }
 
+/* render preview yang aman:
+   - jika previewSel menunjuk ke <svg> -> render JsBarcode
+   - else -> tampilkan teks fallback (untuk modal lama yang pakai teks)
+*/
 function renderPreview(inputSel, previewSel, humanSel){
   const raw = $(inputSel).val();
-  const b = toCode39(raw);
-  $(previewSel).text(b.code39);
-  $(humanSel).text(b.human === '-' ? 'Menunggu input...' : b.human);
+  const barcodeVal = toBarcodeValue(raw || '');
+  // jika element preview adalah svg -> render barcode
+  const $preview = $(previewSel);
+  if ($preview.length && $preview.prop('tagName') === 'svg') {
+    try {
+      JsBarcode(previewSel, barcodeVal || 'ITEM', {
+        format: "CODE128",
+        displayValue: false,
+        height: 40,
+        margin: 0
+      });
+    } catch(e){
+      // fallback: tampil teks
+      $preview.text(raw ? raw : 'Menunggu input...');
+    }
+  } else {
+    // fallback text rendering (compatible dengan modal yang masih teks)
+    $(previewSel).text(raw ? raw : 'Menunggu input...');
+  }
+
+  // human-readable text (nama barang)
+  if (humanSel) {
+    $(humanSel).text(raw ? raw.toString() : 'Menunggu input...');
+  }
 }
 
 /* ============ LOAD TABLE ============ */
@@ -201,12 +225,17 @@ function loadTableBarang() {
       let counter = 1;
       (response.data || []).forEach(value => {
         let stok = (value.stok !== null && value.stok !== '') ? value.stok : "Stok Kosong";
-        let b = toCode39(value.barcode || '');
+
+        // buat id unik untuk svg barcode per row
+        let svgId = `barcodeSvg${value.id}`;
+
+        // barcode value di-generate dari nama barang agar sesuai permintaan
+        let barcodeForJs = toBarcodeValue(value.nama_barang || '');
 
         let barcodeHtml = `
           <div class="barcodeCell">
-            <div class="barcode39">${b.code39}</div>
-            <div class="barcodeText">${b.human}</div>
+            <svg id="${svgId}" class="barcodeSvg" data-barcode="${barcodeForJs}" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="barcodeText">${value.nama_barang ?? '-'}</div>
           </div>
         `;
 
@@ -228,6 +257,23 @@ function loadTableBarang() {
       });
 
       table.draw(false);
+
+      // setelah draw, render semua barcode SVG dengan JsBarcode
+      (response.data || []).forEach(value => {
+        let svgId = `#barcodeSvg${value.id}`;
+        let val = toBarcodeValue(value.nama_barang || '');
+        try {
+          JsBarcode(svgId, val || 'ITEM', {
+            format: "CODE128",
+            displayValue: false,
+            height: 40,
+            margin: 0
+          });
+        } catch (e) {
+          // jika error, biarkan saja (tabel tetap tampil)
+          console.error('JsBarcode error for', svgId, e);
+        }
+      });
     },
     error: function(xhr){
       console.error('LOAD TABLE ERROR:', xhr.status, xhr.responseText);
@@ -281,6 +327,7 @@ $(document).on('click', '#button_tambah_barang', function() {
   $('#deskripsi').val('');
 
   openModalSafe('#modal_tambah_barang');
+  // render preview: jika modal create punya svg dengan id #barcodePreviewCreate, JsBarcode akan menangani
   renderPreview('#barcode', '#barcodePreviewCreate', '#barcodeHumanCreate');
 });
 
@@ -345,9 +392,20 @@ $(document).on('click', '.btn-detail-barang', function() {
       $('#detail_stok_minimum').val(d.stok_minimum ?? 0);
       $('#detail_deskripsi').val(d.deskripsi ?? '');
 
-      let b = toCode39(d.barcode || '');
-      $('#barcodePreviewDetail').text(b.code39);
-      $('#barcodeHumanDetail').text(b.human);
+      // jika di modal detail ada elemen <svg id="barcodePreviewDetail"> -> render JsBarcode
+      const val = toBarcodeValue(d.nama_barang || d.barcode || '');
+      try {
+        JsBarcode('#barcodePreviewDetail', val || 'ITEM', {
+          format: "CODE128",
+          displayValue: false,
+          height: 40,
+          margin: 0
+        });
+      } catch(e){
+        // fallback text jika svg tidak ada atau error
+        $('#barcodePreviewDetail').text(d.nama_barang || d.barcode || '-');
+      }
+      $('#barcodeHumanDetail').text(d.nama_barang ?? '-');
 
       openModalSafe('#modal_detail_barang');
     },
