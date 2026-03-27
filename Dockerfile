@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.2-fpm-alpine
 
 # Instal dependensi Nginx, Node.js (untuk JS/jQuery build), & ekstensi MySQL
 RUN apk add --no-cache \
