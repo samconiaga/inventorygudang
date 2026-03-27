@@ -38,5 +38,5 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 EXPOSE 80
 
 # Perintah saat server/container menyala
-# CMD ["sh", "-c", "php artisan migrate --force && php-fpm -D && nginx -g 'daemon off;'"]
-CMD ["sh", "-c", "php artisan migrate:fresh --seed --force && php-fpm -D && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "php artisan migrate --force && php-fpm -D && nginx -g 'daemon off;'"]
+# CMD ["sh", "-c", "php artisan migrate:fresh --seed --force && php-fpm -D && nginx -g 'daemon off;'"]
