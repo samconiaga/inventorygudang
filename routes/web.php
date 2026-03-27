@@ -146,7 +146,7 @@ Route::middleware('auth')->group(function () {
     | Roles: superadmin, admin gudang
     |---------------------------------------------------------------------------
     */
-    Route::middleware('checkRole:superadmin,admin gudang')->group(function () {
+    Route::middleware('checkRole:superadmin,admin gudang,user')->group(function () {
 
         // ======================
         // MASTER DATA
